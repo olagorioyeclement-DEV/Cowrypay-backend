@@ -16,6 +16,13 @@ class Wallet(models.Model):
     def verify_pin(self, pin):
         return check_password(pin, self.transfer_pin)
 
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    tagname = models.CharField(max_length=30, unique=True)
+
+    def __str__(self):
+        return self.tagname
+
 class Transaction(models.Model):
     TRANSACTION_TYPE = (
         ('credit', 'Credit'),
