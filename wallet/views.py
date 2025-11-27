@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
 from rest_framework import status, generics
-from .models import Wallet, Transaction
+from .models import Wallet, Transaction, Notification, Profile
 from .serializers import UserSerializer, WalletSerializer, TransactionSerializer, NotificationSerializer, ProfileSerializer
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -46,12 +46,23 @@ class SignupView(APIView):
 #Login Endpoint
 class LoginView(APIView):
     def post(self, request):
-        username = request.data['email']
+        username = request.data['username']
         password = request.data['password']
-        user = authenticate(email=username, password=password)
-        if user:
-            return Response({'message': 'User login successfully'})
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({'error': 'Invalid Credentials'}, status=400)
+
+        if not user.check_password(password):
+            return Response({'error': 'Invalid Credentials'}, status=400)
+
+        #Create JWT Token
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'message': 'Login successful',
+            'refresh': str(refresh),
+            'access': str(refresh.access_token)
+        })
 
 #View Wallet
 class WalletView(APIView):
