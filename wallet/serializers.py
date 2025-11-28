@@ -3,9 +3,10 @@ from .models import Wallet, Transaction, Notification, Profile
 from django.contrib.auth.models import User
 
 class UserSerializer(serializers.ModelSerializer):
+    tagname = serializers.CharField(source='profile.tagname', read_only=True)
     class Meta:
         model = User
-        fields = ['id', 'lastname' 'firstname' 'tagname' 'username', 'email']
+        fields = ['id', 'last_name', 'first_name', 'tagname', 'email', 'username' ]
 
 class WalletSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

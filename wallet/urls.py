@@ -9,5 +9,5 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('set-pin/', SetPinView.as_view(), name='set_pin'),
     path('transfer/', TransferView.as_view(), name='transfer'),
-    path('notifications', NotificationListView.as_view(), name='notifications')
+    path('notifications/', NotificationListView.as_view(), name='notifications')
 ]

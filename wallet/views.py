@@ -8,6 +8,7 @@ from .serializers import UserSerializer, WalletSerializer, TransactionSerializer
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
+from decimal import Decimal, InvalidOperation
 
 
 #Signup Endpoint
@@ -80,7 +81,7 @@ class SetPinView(APIView):
     def post(self, request):
         pin = request.data.get('pin')
 
-        if not pin or len(pin) != 4 or pin.isdigit():
+        if not pin or len(pin) != 4 or not pin.isdigit():
             return Response({'error': 'PIN must be 4-digit number'}, status=400)
 
         wallet = Wallet.objects.get(user=request.user)
@@ -93,12 +94,31 @@ class TopupView(APIView):
     permission_classes = ([IsAuthenticated])
 
     def post(self, request):
-        amount = request.data['amount']
+        amount_raw = request.data.get('amount')
+        if not amount_raw:
+            return Response ({'error': 'Amount is required'}, status=400)
+        try:
+            amount = Decimal(amount_raw.replace(',', ''))
+            if amount <= 0:
+                return Response({'error': 'Amount must be greater than 0'}, status=400)
+        except(ValueError, InvalidOperation):
+            return Response({'error': 'Invalid amount'}, status=400)
+
         wallet = Wallet.objects.get(user=request.user)
-        wallet.balance += float(amount)
+        wallet.balance += amount
         wallet.save()
-        Transaction.objects.create(wallet=wallet, amount=amount, transaction_type='credit', description='Top up')
-        return Response({'message': 'Wallet top up successfully', 'balance': wallet.balance})
+
+        Transaction.objects.create(
+            wallet=wallet,
+            amount=amount,
+            transaction_type='Credit',
+            description='Top up'
+        )
+
+        return Response({
+            'message': 'Top up successfully',
+            'balance': str(wallet.balance)
+        })
 
 class TransferView(APIView):
     permission_classes = ([IsAuthenticated])
@@ -114,11 +134,11 @@ class TransferView(APIView):
             return Response({'error': 'Amount is required'}, status=400)
 
         try:
-            amount = float(amount_raw)
+            amount = Decimal(str(amount_raw).replace(',', ''))
             if amount <= 0:
                 return Response({'error': 'Amount must be greater than 0'}, status=400)
-        except (ValueError, TypeError):
-            return Response({'error': 'Invalid amount'}, status=400)
+        except InvalidOperation:
+            return Response({'error': 'Invalid amount format'}, status=400)
 
         #Validate Sender Wallet & Pin
         try:
@@ -181,8 +201,8 @@ class TransferView(APIView):
             'message': 'Transfer Successful',
             'from': sender.profile.tagname,
             'to': receiver_tagname,
-            'amount': amount,
-            'balance': sender_wallet.balance
+            'amount': str(amount),
+            'balance': str(sender_wallet.balance)
         })
 
 class NotificationListView(APIView):
