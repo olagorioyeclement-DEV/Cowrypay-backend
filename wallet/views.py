@@ -9,10 +9,36 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 #Signup Endpoint
 class SignupView(APIView):
+
+    @swagger_auto_schema(
+        tags=['Auth'],
+        operation_summary='Create a user account',
+        operation_description='Register a new user and automatically create a wallet.',
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'lastname': openapi.Schema(type=openapi.TYPE_STRING, example='Olagorioye'),
+                'firstname': openapi.Schema(type=openapi.TYPE_STRING, example='Clement'),
+                'tagname': openapi.Schema(type=openapi.TYPE_STRING, example='Lekan01'),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, example='morakinyo2025@gmail.com'),
+                'username': openapi.Schema(type=openapi.TYPE_STRING, example='Crowner2025'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, example='mypassword123'),
+            },
+            required=['lastname', 'firstname', 'tagname', 'email', 'username', 'password'],
+        ),
+        responses={
+            201: "Signup successful",
+            400: 'Username already exists',
+        }
+    )
+
     def post(self, request):
         lastname = request.data['lastname']
         firstname = request.data['firstname']
@@ -46,6 +72,22 @@ class SignupView(APIView):
 
 #Login Endpoint
 class LoginView(APIView):
+
+    @swagger_auto_schema(
+        tags=['Auth'],
+        operation_summary='User login',
+        operation_description='Authenticate a user and returns a JWT access and refresh token.',
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'username': openapi.Schema(type=openapi.TYPE_STRING, example='Crowner2025'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, example='mypassword123'),
+            },
+            required=['username', 'password'],
+        ),
+        responses={200: 'User login successful'}
+    )
+
     def post(self, request):
         username = request.data['username']
         password = request.data['password']
@@ -67,7 +109,15 @@ class LoginView(APIView):
 
 #View Wallet
 class WalletView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = ([IsAuthenticated])
+
+    @swagger_auto_schema(
+        tags=['Wallet'],
+        operation_summary='Get wallet balance',
+        security=[{'Bearer':[]}],
+        responses={200: 'Wallet retrieved successfully'},
+    )
 
     def get(self, request):
         wallet = Wallet.objects.get(user=request.user)
@@ -76,7 +126,22 @@ class WalletView(APIView):
 
 #Set Pin
 class SetPinView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = ([IsAuthenticated])
+
+    @swagger_auto_schema(
+        tags=['Transfer'],
+        operation_summary='Set 4-digit transfer pin',
+        security=[{'Bearer':[]}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'pin': openapi.Schema(type=openapi.TYPE_STRING, example='1234')
+            },
+            required=['pin']
+        ),
+        responses={200: 'PIN set successful'}
+    )
 
     def post(self, request):
         pin = request.data.get('pin')
@@ -92,6 +157,21 @@ class SetPinView(APIView):
 #Topup Wallet
 class TopupView(APIView):
     permission_classes = ([IsAuthenticated])
+    authentication_classes = [JWTAuthentication]
+
+    @swagger_auto_schema(
+        tags=['Wallet'],
+        operation_summary='Top-up wallet',
+        security=[{'Bearer':[]}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'amount': openapi.Schema(type=openapi.TYPE_NUMBER, example=500)
+            },
+            required=['amount']
+        ),
+        responses={200: 'Top-up successful'}
+    )
 
     def post(self, request):
         amount_raw = request.data.get('amount')
@@ -121,7 +201,24 @@ class TopupView(APIView):
         })
 
 class TransferView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = ([IsAuthenticated])
+
+    @swagger_auto_schema(
+        tags=['Transfer'],
+        operation_summary='Transfer to another user using tagname',
+        security=[{'Bearer':[]}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'receiver': openapi.Schema(type=openapi.TYPE_STRING, example='crowner'),
+                'amount': openapi.Schema(type=openapi.TYPE_NUMBER, example=10000),
+                'pin': openapi.Schema(type=openapi.TYPE_STRING, example='1234'),
+            },
+            required=['receiver', 'amount', 'pin']
+        ),
+        responses={200: 'Transfer successful'}
+    )
 
     def post(self, request):
         sender = request.user
@@ -206,7 +303,14 @@ class TransferView(APIView):
         })
 
 class NotificationListView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = ([IsAuthenticated])
+
+    @swagger_auto_schema(
+        tags=['Notifications'],
+        operation_summary='Get all notifications',
+        security=[{'Bearer':[]}],
+    )
 
     def get(self, request):
         notification = Notification.objects.filter(user=request.user).order_by ('-timestamp')
@@ -214,7 +318,27 @@ class NotificationListView(APIView):
         return Response(serializer.data)
 
 class LogoutView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = ([IsAuthenticated])
+
+    @swagger_auto_schema(
+        tags=['Auth'],
+        operation_summary='Logout user',
+        operation_description='Invalidates user refresh token so it can not be used again.',
+        security=[{'Bearer':[]}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'refresh_token': openapi.Schema(type=openapi.TYPE_STRING, example='refresh_token'),
+            },
+            required=['refresh_token']
+        ),
+        responses={
+            201: 'Logout Successful',
+            400: 'Invalid or expired refresh token',
+        }
+    )
+
     def post(self, request):
         try:
             refresh_token = request.data['refresh_token']
