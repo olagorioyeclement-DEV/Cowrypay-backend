@@ -6,6 +6,7 @@ class Wallet(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transfer_pin = models.CharField(max_length=255, null=True, blank=True)
+    pin_set = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.user.username}'s wallet"
@@ -15,6 +16,7 @@ class Wallet(models.Model):
 
     def verify_pin(self, pin):
         return check_password(pin, self.transfer_pin)
+    
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)

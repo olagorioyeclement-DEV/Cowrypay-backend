@@ -99,12 +99,18 @@ class LoginView(APIView):
         if not user.check_password(password):
             return Response({'error': 'Invalid Credentials'}, status=400)
 
+        try:
+            wallet = Wallet.objects.get(user=user)
+        except Wallet.DoesNotExist:
+            return Response({"error": "Wallet not found"}, status=404)
+
         #Create JWT Token
         refresh = RefreshToken.for_user(user)
         return Response({
             'message': 'Login successful',
             'refresh': str(refresh),
-            'access': str(refresh.access_token)
+            'access': str(refresh.access_token),
+            'pin_set': wallet.pin_set,
         })
 
 #View Wallet
@@ -151,6 +157,7 @@ class SetPinView(APIView):
 
         wallet = Wallet.objects.get(user=request.user)
         wallet.set_pin(pin)
+        wallet.pin_set = True
         wallet.save()
         return Response({'message': 'PIN set successfully'})
 
