@@ -1,5 +1,18 @@
 from django.urls import path
-from .views import SignupView, LoginView, WalletView, TopupView, LogoutView, SetPinView, TransferView, NotificationListView
+from .views import (
+    SignupView,
+    LoginView,
+    WalletView,
+    TopupView,
+    LogoutView,
+    SetPinView,
+    TransferView,
+    NotificationListView,
+    VerifyTagView,
+    TransactionListView,
+    TransactionDetailView,
+)
+
 
 urlpatterns = [
 
@@ -15,6 +28,9 @@ urlpatterns = [
     #Transfer Endpoints
     path('set-pin/', SetPinView.as_view(), name='set_pin'),
     path('transfer/', TransferView.as_view(), name='transfer'),
+    path('verify-tag/', VerifyTagView.as_view(), name='verify_tag'),
+    path('transactions/', TransactionListView.as_view(), name='transactions'),
+    path('transactions/<str:identifier>/', TransactionDetailView.as_view(), name='transaction_detail'),
 
     #Notifications Endpoints
     path('notifications/', NotificationListView.as_view(), name='notifications')

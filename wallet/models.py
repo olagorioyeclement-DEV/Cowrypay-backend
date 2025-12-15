@@ -1,6 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, check_password
+import uuid
+from django.utils import timezone
+
 
 class Wallet(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -16,7 +19,7 @@ class Wallet(models.Model):
 
     def verify_pin(self, pin):
         return check_password(pin, self.transfer_pin)
-    
+
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -35,9 +38,27 @@ class Transaction(models.Model):
     transaction_type = models.CharField(max_length=6, choices=TRANSACTION_TYPE)
     timestamp = models.DateTimeField(auto_now_add=True)
     description = models.CharField(max_length=255, blank=True)
+    reference = models.CharField(max_length=90, blank=True, unique=True)
+    narration = models.CharField(max_length=255, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.timestamp:
+            self.timestamp = timezone.now()
+
+        if not self.reference:
+            self.reference = self.generate_unique_reference()
+        super().save(*args, **kwargs)
+
+    def generate_unique_reference(self):
+        date_part = timezone.now().strftime('%Y%m%d')
+        while True:
+            random_part = uuid.uuid4().hex[:8].upper()
+            ref = f'TRX-{date_part}-{random_part}'
+            if not Transaction.objects.filter(reference=ref).exists():
+                return ref
 
     def __str__(self):
-        return f"{self.transaction_type} - {self.amount} for {self.wallet.user.username}"
+        return f"{self.transaction_type} - {self.amount} for {self.wallet.user.username} ({self.reference})"
 
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

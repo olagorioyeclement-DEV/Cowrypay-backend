@@ -22,7 +22,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
-        fields = ['id', 'wallet', 'amount', 'transaction_type', 'timestamp', 'description']
+        fields = ['reference', 'wallet', 'amount', 'transaction_type', 'timestamp', 'description', 'narration']
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
