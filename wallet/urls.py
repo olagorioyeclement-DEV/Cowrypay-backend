@@ -13,6 +13,7 @@ from .views import (
     TransactionDetailView,
     UserSettingsView,
     ChangePinView,
+    ChangePasswordView,
 )
 
 
@@ -26,6 +27,7 @@ urlpatterns = [
     #Wallet Endpoints
     path('wallet/', WalletView.as_view(), name='wallet'),
     path('topup/', TopupView.as_view(), name='topup'),
+    path('change-password/', ChangePasswordView.as_view(), name='change_password'),
 
     #Transfer Endpoints
     path('set-pin/', SetPinView.as_view(), name='set_pin'),

@@ -14,6 +14,8 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 
 #Signup Endpoint
@@ -554,5 +556,45 @@ class ChangePinView(APIView):
             status=200
         )
 
+class ChangePasswordView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        tags=['Wallet'],
+        operation_summary='Change existing Password to Log in to the CowryPay wallet',
+        security=[{'Bearer': []}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'old_password': openapi.Schema(type=openapi.TYPE_STRING, example='mypassword123'),
+                'new_password': openapi.Schema(type=openapi.TYPE_STRING, example='mypassword123'),
+            },
+            required=['old_password', 'new_password']
+        ),
+        responses={200: 'Password updated successfully'}
+    )
+    def post(self, request):
+
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not old_password or not new_password:
+            return Response(
+                {'error': 'Old Password and new Password are required'},
+                status=400
+            )
+
+        if not user.check_password(old_password):
+            return Response({'error': 'Old password is incorrect'}, status=400)
+
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response({'error': e.messages}, status=400)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({'message': 'password updated successfully'}, status=200)
 
 
