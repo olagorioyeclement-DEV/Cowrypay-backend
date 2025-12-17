@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, check_password
 import uuid
 from django.utils import timezone
+from django.conf import settings
 
 
 class Wallet(models.Model):
@@ -68,3 +69,13 @@ class Notification(models.Model):
 
     def __str__(self):
         return f'{self.user.username} - {self.message}'
+
+class UserSettings(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='settings')
+    theme = models.CharField(max_length=20, default='soft')
+    notification_enabled = models.BooleanField(default=True)
+    transaction_alert = models.BooleanField(default=True)
+    two_factor_authentication = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f'{self.user.username} settings'

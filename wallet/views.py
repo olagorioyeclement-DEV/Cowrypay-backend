@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from rest_framework.views import APIView
 from rest_framework import status, generics
-from .models import Wallet, Transaction, Notification, Profile
-from .serializers import UserSerializer, WalletSerializer, TransactionSerializer, NotificationSerializer, ProfileSerializer
+from .models import Wallet, Transaction, Notification, Profile, UserSettings
+from .serializers import UserSerializer, WalletSerializer, TransactionSerializer, NotificationSerializer, ProfileSerializer, UserSettingsSerializer
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
@@ -156,12 +156,20 @@ class SetPinView(APIView):
 
         if not pin or len(pin) != 4 or not pin.isdigit():
             return Response({'error': 'PIN must be 4-digit number'}, status=400)
-
-        wallet = Wallet.objects.get(user=request.user)
+        try:
+            wallet = Wallet.objects.get(user=request.user)
+        except Wallet.DoesNotExist:
+            return Response({'error': 'Wallet not found'}, status=404)
         wallet.set_pin(pin)
         wallet.pin_set = True
         wallet.save()
-        return Response({'message': 'PIN set successfully'})
+        return Response(
+            {
+                'message': 'PIN set successfully',
+                'pin_set': True
+            },
+            status=200
+        )
 
 #Topup Wallet
 class TopupView(APIView):
@@ -466,6 +474,82 @@ class TransactionDetailView(APIView):
 
         serializer = TransactionSerializer(tx)
         return Response(serializer.data)
+
+class UserSettingsView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        tags=['Settings'],
+        operation_summary='Get user settings',
+        security=[{'Bearer': []}],
+    )
+
+    def get(self, request):
+        settings = request.user.settings
+        serializer = UserSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    def put(self, request):
+        settings = request.user.settings
+        serializer = UserSettingsSerializer(
+            settings, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+class ChangePinView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        tags=['Wallet'],
+        operation_summary='Change existing 4-digit transfer PIN',
+        security=[{'Bearer': []}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'old_pin': openapi.Schema(type=openapi.TYPE_STRING, example='1234'),
+                'new_pin': openapi.Schema(type=openapi.TYPE_STRING, example='5678'),
+            },
+            required=['old_pin', 'new_pin']
+        ),
+        responses={200: 'PIN updated successfully'}
+    )
+
+    def post(self, request):
+
+        old_pin = request.data.get('old_pin')
+        new_pin = request.data.get('new_pin')
+
+        if not old_pin or not new_pin:
+            return Response(
+                {'error': 'Old PIN and new PIN are required'},
+                status=400
+            )
+
+        if len(new_pin) != 4 or not new_pin.isdigit():
+            return Response({'error': 'New PIN must be exactly 4 digit'}, status=400)
+
+        try:
+            wallet = Wallet.objects.get(user=request.user)
+        except Wallet.DoesNotExist:
+            return Response({'error': 'Wallet no found'}, status=400)
+
+        if wallet.pin != old_pin:
+            return Response({'error': 'Incorrect old Pin'}, status=400)
+
+        wallet.set_pin(new_pin)
+        wallet.pin_set = True
+        wallet.save()
+        return Response(
+            {
+                'message': 'PIN set successfully',
+                'pin_set': True
+            },
+            status=200
+        )
 
 
 

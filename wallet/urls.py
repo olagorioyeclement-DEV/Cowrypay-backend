@@ -11,6 +11,8 @@ from .views import (
     VerifyTagView,
     TransactionListView,
     TransactionDetailView,
+    UserSettingsView,
+    ChangePinView,
 )
 
 
@@ -31,7 +33,11 @@ urlpatterns = [
     path('verify-tag/', VerifyTagView.as_view(), name='verify_tag'),
     path('transactions/', TransactionListView.as_view(), name='transactions'),
     path('transactions/<str:identifier>/', TransactionDetailView.as_view(), name='transaction_detail'),
+    path('change-pin/', ChangePinView.as_view(), name='change_pin'),
 
     #Notifications Endpoints
-    path('notifications/', NotificationListView.as_view(), name='notifications')
+    path('notifications/', NotificationListView.as_view(), name='notifications'),
+
+    #Settings Endpoints
+    path('settings/', UserSettingsView.as_view(), name='user_settings')
 ]
