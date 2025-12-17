@@ -537,8 +537,11 @@ class ChangePinView(APIView):
         except Wallet.DoesNotExist:
             return Response({'error': 'Wallet no found'}, status=400)
 
-        if wallet.pin != old_pin:
-            return Response({'error': 'Incorrect old Pin'}, status=400)
+        if not wallet.transfer_pin:
+            return Response({'error': 'No pin set'}, status=400)
+
+        if not wallet.verify_pin(old_pin):
+            return Response({'error': 'Incorrect old pin'}, status=400)
 
         wallet.set_pin(new_pin)
         wallet.pin_set = True
