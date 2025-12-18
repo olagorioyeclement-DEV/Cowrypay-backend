@@ -17,7 +17,7 @@ class WalletSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['tagname']
+        fields = ['tagname', 'avatar']
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:

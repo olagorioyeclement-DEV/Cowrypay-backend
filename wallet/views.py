@@ -16,6 +16,10 @@ from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
+from PIL import Image
+from django.core.files.base import ContentFile
+from io import BytesIO
 
 
 #Signup Endpoint
@@ -576,6 +580,7 @@ class ChangePasswordView(APIView):
     )
     def post(self, request):
 
+        user = request.user
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
 
@@ -595,6 +600,60 @@ class ChangePasswordView(APIView):
 
         user.set_password(new_password)
         user.save()
-        return Response({'message': 'password updated successfully'}, status=200)
+        return Response({'message': 'Password updated successfully'}, status=200)
 
+class ProfilePictureView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
+    @swagger_auto_schema(
+        tags=['Profile'],
+        operation_summary='Upload Profile Picture',
+        security=[{"Bearer": []}],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "avatar": openapi.Schema(
+                    type=openapi.TYPE_FILE,
+                    description="Profile picture file"
+                )
+            },
+            required=["avatar"]
+        ),
+        responses={200: "Profile picture updated"}
+    )
+
+    def post(self, request):
+
+        user = request.user
+        profile = user.profile
+        avatar = request.FILES.get('avatar')
+
+        if not avatar:
+            return Response({'error': 'No Image Uploaded'}, status=400)
+
+        ALLOWED_EXTENSTIONS = ['.jpg', '.png', '.jpeg']
+        ext = os.path.splitext(avatar.name)[1].lower()
+
+        if ext not in ALLOWED_EXTENSTIONS:
+            return Response({'error': 'Only PNG and JPG are allowed'}, status=400)
+
+        if avatar.size > 2 * 1024 * 1024:
+            return Response({'error' 'Image size must not exceed 2MB'}, status=400)
+
+        img = Image.open(avatar)
+        img = img.convert('RGB')
+        img = img.resize((300, 300))
+
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG')
+        image_file = ContentFile(buffer.getvalue(), name=avatar.name)
+
+        profile.avatar.save(avatar.name, image_file)
+        profile.save()
+
+        return Response(
+            {'message': 'Profile picture uploaded successfully'},
+            status=200
+        )

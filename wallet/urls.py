@@ -14,6 +14,7 @@ from .views import (
     UserSettingsView,
     ChangePinView,
     ChangePasswordView,
+    ProfilePictureView,
 )
 
 
@@ -41,5 +42,8 @@ urlpatterns = [
     path('notifications/', NotificationListView.as_view(), name='notifications'),
 
     #Settings Endpoints
-    path('settings/', UserSettingsView.as_view(), name='user_settings')
+    path('settings/', UserSettingsView.as_view(), name='user_settings'),
+
+    #Profile Endpoints
+    path('profile-picture/', ProfilePictureView.as_view(), name='profile_picture')
 ]
