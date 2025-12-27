@@ -20,6 +20,27 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from PIL import Image
 from django.core.files.base import ContentFile
 from io import BytesIO
+import os
+from wallet.services.paystack import verify_bank_account
+
+NIGERIAN_BANKS = {
+    'Access Bank': '044',
+    'First Bank': '011',
+    'GTBank': '058',
+    'UBA': '033',
+    'Zenith Bank': '057',
+    'Ecobank': '050',
+    'Fidelity Bank': '070',
+    'Stanbic IBTC': '039',
+    'Sterling Bank': '232',
+    'Union Bank': '032',
+    'Wema Bank': '035',
+    'Polaris Bank': '076',
+    'Keystone Bank': '082',
+    'Jaiz Bank': '301',
+    'Providus Bank': '101',
+}
+
 
 
 #Signup Endpoint
@@ -490,20 +511,32 @@ class UserSettingsView(APIView):
         operation_summary='Get user settings',
         security=[{'Bearer': []}],
     )
-
     def get(self, request):
         settings = request.user.settings
         serializer = UserSettingsSerializer(settings)
-        return Response(serializer.data)
+        data = serializer.data
+
+        # include profile avatar absolute URL so frontend can persist it
+        profile = getattr(request.user, "profile", None)
+        data["avatar"] = (
+            request.build_absolute_uri(profile.avatar.url) if profile and profile.avatar else None
+        )
+
+        return Response(data)
 
     def put(self, request):
         settings = request.user.settings
-        serializer = UserSettingsSerializer(
-            settings, data=request.data, partial=True
-        )
+        serializer = UserSettingsSerializer(settings, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data)
+
+        data = serializer.data
+        profile = getattr(request.user, "profile", None)
+        data["avatar"] = (
+            request.build_absolute_uri(profile.avatar.url) if profile and profile.avatar else None
+        )
+        return Response(data)
+
 
 class ChangePinView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -610,50 +643,143 @@ class ProfilePictureView(APIView):
     @swagger_auto_schema(
         tags=['Profile'],
         operation_summary='Upload Profile Picture',
-        security=[{"Bearer": []}],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                "avatar": openapi.Schema(
-                    type=openapi.TYPE_FILE,
-                    description="Profile picture file"
-                )
-            },
-            required=["avatar"]
-        ),
+        security=[{'Bearer': []}],
+        manual_parameters=[
+            openapi.Parameter(
+                name='avatar',
+                in_=openapi.IN_FORM,
+                type=openapi.TYPE_FILE,
+                required=True,
+                description='Profile picture (jpg/png, max 2MB)'
+            ),
+        ],
+        consumes=['multipart/form-data'],
         responses={200: "Profile picture updated"}
     )
 
     def post(self, request):
 
         user = request.user
-        profile = user.profile
-        avatar = request.FILES.get('avatar')
+        profile = getattr(user, 'profile', None)
+        if profile is None:
+            return Response({'error': 'User profile not found'}, status=400)
 
-        if not avatar:
-            return Response({'error': 'No Image Uploaded'}, status=400)
+        candidate_fields = ('avatar', 'image', 'profile_picture', 'profile_image', 'file')
+        uploaded = None
+        for fld in candidate_fields:
+            uploaded = request.FILES.get(fld)
+            if uploaded:
+                break
+        if not uploaded:
+            return Response({'error': 'No image uploaded'}, status=400)
 
-        ALLOWED_EXTENSTIONS = ['.jpg', '.png', '.jpeg']
-        ext = os.path.splitext(avatar.name)[1].lower()
-
-        if ext not in ALLOWED_EXTENSTIONS:
+        ALLOWED_EXTENSIONS = ['.jpg', '.png', '.jpeg']
+        ext = os.path.splitext(uploaded.name)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
             return Response({'error': 'Only PNG and JPG are allowed'}, status=400)
 
-        if avatar.size > 2 * 1024 * 1024:
-            return Response({'error' 'Image size must not exceed 2MB'}, status=400)
+        if uploaded.size > 2 * 1024 * 1024:
+            return Response({'error': 'Image size must not exceed 2MB'}, status=400)
 
-        img = Image.open(avatar)
-        img = img.convert('RGB')
-        img = img.resize((300, 300))
+        try:
+            img = Image.open(uploaded)
+            img = img.convert('RGB')
+            img = img.resize((300, 300))
 
-        buffer = BytesIO()
-        img.save(buffer, format='JPEG')
-        image_file = ContentFile(buffer.getvalue(), name=avatar.name)
+            buffer = BytesIO()
+            img.save(buffer, format='JPEG', quality=85)
+            image_file = ContentFile(buffer.getvalue(), name=os.path.splitext(uploaded.name)[0] + '.jpg')
 
-        profile.avatar.save(avatar.name, image_file)
+            profile.avatar.save(image_file.name, image_file, save=True)
+            profile.save()
+
+            avatar_url = request.build_absolute_uri(profile.avatar.url) if profile.avatar else None
+            return Response(
+                {'message': 'Profile picture uploaded successfully', 'url': avatar_url},
+                status=200
+            )
+
+        except Exception as e:
+            return Response({'error': f'Failed to process image: {str(e)}'}, status=500)
+
+class BankAccountView(APIView):
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    @swagger_auto_schema(
+        tags=['Redemption'],
+        operation_summary='Add or update bank account for redemption',
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['bank_name', 'account_number'],
+            properties={
+                'bank_name': openapi.Schema(type=openapi.TYPE_STRING, example='First Bank'),
+                'account_number': openapi.Schema(type=openapi.TYPE_NUMBER, example='0123456789'),
+                'pin': openapi.Schema(type=openapi.TYPE_NUMBER, example='1234')
+            }
+        ),
+        responses={
+            200: 'Bank account updated successfully',
+            400: 'Validation error',
+            401: 'Unauthorized'}
+    )
+
+    def post(self, request):
+
+        user = request.user
+        profile = getattr(user, 'profile', None)
+
+        if profile is None:
+            return Response({'error': 'User profile not found'}, status=400)
+
+        try:
+            wallet = Wallet.objects.get(user=user)
+        except Wallet.DoesNotExist:
+            return Response({'error': 'User wallet not found'}, status=400)
+
+        bank_code = request.data.get('bank_code')
+        account_number = request.data.get('account_number')
+        pin = request.data.get('pin')
+
+        if not bank_code or not account_number:
+            return Response({'error': 'Bank code and Account number are required'}, status=400)
+
+        if len(account_number) != 10 or not account_number.isdigit():
+            return Response({'error': 'Account number must be 10 digits'}, status=400)
+
+        if not pin:
+            return Response({'error': 'Transfer Pin is required'}, status=400)
+
+        if not wallet.verify_pin(pin):
+            return Response({'error': 'Invalid Transfer Pin'}, status=400)
+
+        account_name = verify_bank_account(account_number, bank_code)
+        if not account_name:
+            return Response({'error': 'Invalid bank account'}, status=400)
+
+        profile.bank_code = bank_code
+        profile.account_number = account_number
+        profile.account_name = account_name
         profile.save()
 
+        Transaction.objects.create(
+            user=user,
+            wallet=wallet,
+            transaction_type="BANK_UPDATE",
+            amount=0,
+            status="SUCCESS",
+            description=f"Updated bank to {bank_code} ({account_number})"
+        )
+
         return Response(
-            {'message': 'Profile picture uploaded successfully'},
+            {
+                'message': 'Bank account updated successfully',
+                'bank_code': bank_code,
+                'account_number': account_number,
+            },
             status=200
         )
+
+class RedemptionView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]

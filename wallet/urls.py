@@ -15,6 +15,7 @@ from .views import (
     ChangePinView,
     ChangePasswordView,
     ProfilePictureView,
+    BankAccountView,
 )
 
 
@@ -43,6 +44,9 @@ urlpatterns = [
 
     #Settings Endpoints
     path('settings/', UserSettingsView.as_view(), name='user_settings'),
+
+    #Redemption
+    path('bank-account/', BankAccountView.as_view(), name='bank_account'),
 
     #Profile Endpoints
     path('profile-picture/', ProfilePictureView.as_view(), name='profile_picture')

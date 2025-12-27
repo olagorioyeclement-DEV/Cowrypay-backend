@@ -26,6 +26,8 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     tagname = models.CharField(max_length=30, unique=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    bank_name = models.CharField(max_length=120, blank=True)
+    account_number = models.CharField(max_length=10, blank=True)
 
     def __str__(self):
         return self.tagname
@@ -42,6 +44,9 @@ class Transaction(models.Model):
     description = models.CharField(max_length=255, blank=True)
     reference = models.CharField(max_length=90, blank=True, unique=True)
     narration = models.CharField(max_length=255, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    status = models.CharField(max_length=20, default='PENDING')
+
 
     def save(self, *args, **kwargs):
         if not self.timestamp:

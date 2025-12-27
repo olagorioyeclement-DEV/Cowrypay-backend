@@ -1,0 +1,17 @@
+NIGERIAN_BANKS = {
+'Access Bank': '044',
+'First Bank': '011',
+'GTBank': '058',
+'UBA': '033',
+'Zenith Bank': '057',
+'Ecobank': '050',
+'Fidelity Bank': '070',
+'Stanbic IBTC': '039',
+'Sterling Bank': '232',
+'Union Bank': '032',
+'Wema Bank': '035',
+'Polaris Bank': '076',
+'Keystone Bank': '082',
+'Jaiz Bank': '301',
+'Providus Bank': '101',
+}
